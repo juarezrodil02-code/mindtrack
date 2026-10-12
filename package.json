@@ -1,0 +1,21 @@
+{
+  "name": "mindtrack",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @mindtrack/web dev",
+    "build": "pnpm --filter @mindtrack/shared build && pnpm --filter @mindtrack/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1",
+    "typescript": "^5.4.5"
+  }
+}
