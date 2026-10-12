@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
-  "buildCommand": "pnpm build",
+  "installCommand": "npm install -g pnpm && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @mindtrack/shared build && pnpm --filter @mindtrack/web build",
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     {
