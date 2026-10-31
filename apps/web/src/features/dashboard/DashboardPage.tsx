@@ -5,6 +5,7 @@ import { useTasks } from '@/features/tasks/hooks'
 import { useAuth } from '@/app/AuthProvider'
 import { formatDueDate } from '@/lib/dateUtils'
 import { Flame, CheckCircle2, Clock, BookOpen, TrendingUp, ArrowUpRight } from 'lucide-react'
+import { InspirationWidget } from '@/features/inspiration/InspirationWidget'
 
 export function DashboardPage() {
   const { profile } = useAuth()
@@ -30,6 +31,9 @@ export function DashboardPage() {
           <p className="page-subtitle">Your study overview</p>
         </div>
       </div>
+
+      {/* Daily Inspiration & Vision Board */}
+      <InspirationWidget />
 
       {isLoading ? (
         <div className="page-loading"><div className="spinner" /></div>

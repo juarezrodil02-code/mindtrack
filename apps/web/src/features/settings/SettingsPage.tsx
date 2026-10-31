@@ -1,8 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '@/app/AuthProvider'
+import { useTheme } from '@/app/ThemeContext'
 import { supabase } from '@/lib/supabase'
-import { Moon, Timer, Save, CheckCircle, AlertTriangle, Globe, XCircle } from 'lucide-react'
+import {
+  getStoredAvatar, saveStoredAvatar, removeStoredAvatar
+} from '@/features/inspiration/storage'
+import {
+  Moon, Sun, Timer, Save, CheckCircle, AlertTriangle,
+  Globe, XCircle, Camera, Trash2, Upload
+} from 'lucide-react'
 
 interface SettingsFormValues {
   name: string
@@ -35,9 +42,13 @@ const COMMON_TIMEZONES = [
 
 export function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth()
+  const { theme, setTheme } = useTheme()
   const [saved, setSaved] = useState(false)
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarLoading, setAvatarLoading] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<SettingsFormValues>({
     defaultValues: {
@@ -54,7 +65,11 @@ export function SettingsPage() {
   // Watch current timezone to display dynamic feedback
   const currentTimezone = watch('timezone')
 
-  // When profile loads or changes, populate form values
+  // Load avatar and profile
+  useEffect(() => {
+    getStoredAvatar().then(setAvatarUrl)
+  }, [])
+
   useEffect(() => {
     if (profile) {
       reset({
@@ -69,6 +84,38 @@ export function SettingsPage() {
     }
   }, [profile, reset])
 
+  async function handleAvatarUpload(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Please select a valid image file.')
+      return
+    }
+    try {
+      setAvatarLoading(true)
+      const url = await saveStoredAvatar(file)
+      setAvatarUrl(url)
+      setSaveSuccessMessage('Profile photo updated successfully!')
+      setTimeout(() => setSaveSuccessMessage(null), 3000)
+    } catch {
+      setErrorMessage('Failed to upload profile photo.')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    try {
+      setAvatarLoading(true)
+      await removeStoredAvatar()
+      setAvatarUrl(null)
+      setSaveSuccessMessage('Profile photo removed.')
+      setTimeout(() => setSaveSuccessMessage(null), 3000)
+    } catch {
+      setErrorMessage('Failed to remove profile photo.')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
   async function onSave(values: SettingsFormValues) {
     setErrorMessage(null)
     setSaveSuccessMessage(null)
@@ -82,7 +129,6 @@ export function SettingsPage() {
     const qStart = values.quiet_start?.trim() || null
     const qEnd = values.quiet_end?.trim() || null
 
-    // Postgres constraint quiet_both_or_neither: both must be set or both null
     if ((qStart && !qEnd) || (!qStart && qEnd)) {
       setErrorMessage('Quiet hours require both a Start time and End time. Leave both empty to disable.')
       return
@@ -111,7 +157,7 @@ export function SettingsPage() {
 
       await refreshProfile()
       setSaved(true)
-      setSaveSuccessMessage('Settings saved successfully! Timezone and preferences are now active.')
+      setSaveSuccessMessage('Settings saved successfully! Preferences are now active.')
       setTimeout(() => {
         setSaved(false)
         setSaveSuccessMessage(null)
@@ -126,7 +172,6 @@ export function SettingsPage() {
     setValue('quiet_end', '')
   }
 
-  // Ensure current timezone exists in the options list if custom
   const isCustomTz = currentTimezone && !COMMON_TIMEZONES.some(tz => tz.value === currentTimezone)
 
   return (
@@ -151,10 +196,99 @@ export function SettingsPage() {
             </div>
           )}
 
-          {/* Profile */}
+          {/* Appearance & Theme */}
           <section className="settings-section">
-            <h2 className="settings-section-title">Profile</h2>
-            <div className="form-group">
+            <h2 className="settings-section-title">
+              <Sun size={16} /> Appearance & Theme
+            </h2>
+            <p className="settings-desc">
+              Choose your preferred visual theme for the MindTrack workspace.
+            </p>
+            <div className="theme-options-grid">
+              <button
+                type="button"
+                className={`theme-option-card ${theme === 'dark' ? 'theme-option-card--active' : ''}`}
+                onClick={() => setTheme('dark')}
+              >
+                <div className="theme-option-icon theme-option-icon--dark">
+                  <Moon size={18} />
+                </div>
+                <div className="theme-option-info">
+                  <span className="theme-option-name">Dark Mode</span>
+                  <span className="theme-option-desc">Sleek midnight palette, easy on the eyes</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`theme-option-card ${theme === 'light' ? 'theme-option-card--active' : ''}`}
+                onClick={() => setTheme('light')}
+              >
+                <div className="theme-option-icon theme-option-icon--light">
+                  <Sun size={18} />
+                </div>
+                <div className="theme-option-info">
+                  <span className="theme-option-name">Light Mode</span>
+                  <span className="theme-option-desc">Crisp slate palette, daytime high contrast</span>
+                </div>
+              </button>
+            </div>
+          </section>
+
+          {/* Profile & Picture */}
+          <section className="settings-section">
+            <h2 className="settings-section-title">Profile & Photo</h2>
+
+            <div className="settings-avatar-row">
+              <div className="settings-avatar-wrap">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Profile photo" className="settings-avatar-img" />
+                ) : (
+                  <div className="settings-avatar-fallback">
+                    {(profile?.name ?? user?.email ?? 'U')[0].toUpperCase()}
+                  </div>
+                )}
+              </div>
+
+              <div className="settings-avatar-actions">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleAvatarUpload(e.target.files[0])
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn--sm btn--ghost"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarLoading}
+                >
+                  <Camera size={14} />
+                  <span>{avatarLoading ? 'Uploading...' : 'Upload Photo'}</span>
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--danger"
+                    onClick={handleRemoveAvatar}
+                    disabled={avatarLoading}
+                  >
+                    <Trash2 size={14} />
+                    <span>Remove</span>
+                  </button>
+                )}
+                <span className="form-hint" style={{ marginTop: '4px', display: 'block' }}>
+                  PNG, JPG or WEBP (Saved locally to your device)
+                </span>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '20px' }}>
               <label htmlFor="s-name" className="form-label">Name</label>
               <input
                 id="s-name"
